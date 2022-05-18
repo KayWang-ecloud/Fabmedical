@@ -1,0 +1,50 @@
+on: [push]
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    
+    - uses: azure/docker-login@v1
+      with:
+        login-server: fabmedicalkay.azurecr.io
+        username: ${{ secrets.acr_fabmedicalkay_username }}
+        password: ${{ secrets.acr_fabmedicalkay_password }}
+    
+    - name: Build and push image to ACR
+      id: build-image
+      run: |
+        docker build "$GITHUB_WORKSPACE/content-web" -f  "content-web/Dockerfile" -t fabmedicalkay.azurecr.io/fabmedicalkay:${{ github.sha }} --label dockerfile-path=content-web/Dockerfile
+        docker push fabmedicalkay.azurecr.io/fabmedicalkay:${{ github.sha }}
+    
+    - uses: azure/k8s-set-context@v1
+      with:
+         kubeconfig: ${{ secrets.aks_fabmedicalkay_kubeConfig }}
+      id: login
+    
+    - name: Create namespace
+      run: |
+        namespacePresent=`kubectl get namespace | grep ingress-demo | wc -l`
+        if [ $namespacePresent -eq 0 ]
+        then
+            echo `kubectl create namespace ingress-demo`
+        fi
+
+    - uses: azure/k8s-create-secret@v1
+      with:
+        namespace: ingress-demo
+        container-registry-url: fabmedicalkay.azurecr.io
+        container-registry-username: ${{ secrets.acr_fabmedicalkay_username }}
+        container-registry-password: ${{ secrets.acr_fabmedicalkay_password }}
+        secret-name: fabmedicalkadockerauth
+       
+    - uses: azure/k8s-deploy@v1.2
+      with:
+        namespace: ingress-demo
+        manifests: |
+          manifests/deployment-1.yml
+          manifests/service-1.yml
+        images: |
+          fabmedicalkay.azurecr.io/fabmedicalkay:${{ github.sha }}
+        imagepullsecrets: |
+          fabmedicalkadockerauth
