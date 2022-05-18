@@ -1,0 +1,19 @@
+apiVersion : apps/v1
+kind: Deployment
+metadata:
+  name: "fabmedicalkay-0e01"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: "fabmedicalkay-0e01"
+  template:
+    metadata:
+      labels:
+        app: "fabmedicalkay-0e01"
+    spec:
+      containers:
+        - name: "fabmedicalkay-0e01"
+          image: "fabmedicalkay.azurecr.io/fabmedicalkay"
+          ports:
+          - containerPort: 3000
